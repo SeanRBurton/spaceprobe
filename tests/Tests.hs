@@ -1,8 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 import Control.Exception (assert)
-import Control.SpaceProbe.Probe
-import Control.SpaceProbe.Search
+import Control.Monad.Identity (Identity(..), runIdentity)
+import Control.SpaceProbe
+import Control.SpaceProbe.Internal.Optimize
 import Data.List (sort)
 import Data.Maybe (isJust)
 import Test.Framework (Test, defaultMain)
@@ -30,7 +31,10 @@ validateSearchTree (SearchTree node xs)
         explored = filter fullyExplored nodes
         maxes = map _maximum nodes
         playouts = map _playouts nodes
-  
+
+playout :: (t -> Float) -> Float -> Float -> SearchTree t -> PlayoutResult t
+playout eval l u = runIdentity . playoutM (Identity . eval) l u
+
 maximizationTree :: (t -> Float) -> Probe t -> Int -> SearchTree t
 maximizationTree eval p k = go k inf (-inf) $ searchTree p
   where inf = 1 / 0 :: Float                                                    

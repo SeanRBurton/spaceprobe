@@ -27,10 +27,9 @@ library
                  clock,
                  erf,
                  mtl
-  exposed-modules: Control.SpaceProbe.Probe
-                   Control.SpaceProbe.Search
-                  -- Control.SpaceProbe.Internal.Probe
-                  -- Control.SpaceProbe.Internal.Search
+  exposed-modules: Control.SpaceProbe
+                   Control.SpaceProbe.Internal.Probe
+                   Control.SpaceProbe.Internal.Optimize
   ghc-options: -O3 -fllvm -Wall
 
 test-suite tests

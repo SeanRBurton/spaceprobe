@@ -1,8 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 
 import Control.Applicative
-import Control.SpaceProbe.Probe
-import Control.SpaceProbe.Search
+import Control.SpaceProbe
 import Criterion.Main
 
 dsq :: Float -> Float -> Float 
