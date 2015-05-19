@@ -144,7 +144,7 @@ playout eval = go
 maximize :: (t -> Float) -> Probe t -> [(t, Float)]
 maximize eval p = go inf (-inf) $ searchTree p
   where inf = 1 / 0 :: Float 
-        go l u t = (x, e) : (if b then [] else go l' u' t')
+        go l u t = (x, e) : (if b || (u' == inf) then [] else go l' u' t')
           where PlayoutResult t' x e l' u' b = playout eval l u t
 
 -- | The opposite of maximize. 

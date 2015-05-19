@@ -1,7 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
 
-module Benchmarks where
-
 import Control.Applicative
 import Control.SpaceProbe.Probe
 import Control.SpaceProbe.Search

@@ -46,12 +46,12 @@ import Control.Applicative (
 import Data.Number.Erf (Erf, InvErf, invnormcdf, normcdf)
 import Data.Tree(Forest, Tree(..))
 
--- | The main data s  tructure for this module; it describes 
+-- | The main data structure for this module; it describes 
 --  a search space and an associated exploration strategy.
 -- 
 -- This type is an instance of the following classes: 
 -- 
--- * 'Functor', which does the obvious thing.
+-- * 'Functor' which does the obvious thing.
 -- 
 -- * 'Applicative', which allows us to combine multiple search spaces and 
 --   optimize over them simultaneously.
@@ -149,9 +149,9 @@ bisect f y a b = go (intAve a b) a b
           | otherwise = let v    = intAve a' b' 
                             z    = f v
                         in case compare z y of 
-                             LT -> go v (v + 1) b 
+                             LT -> go v (v + 1) b' 
                              EQ -> v 
-                             GT -> go v a v
+                             GT -> go v a' v
 
 -- | Approximately sample from a probability distribution over the range
 -- [a, b). Relies on splitting the range into regions of approximately 

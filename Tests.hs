@@ -1,7 +1,12 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 import Control.Exception (assert)
 import Control.SpaceProbe.Probe
 import Control.SpaceProbe.Search
+import Data.List  (nub, sort)
 import Data.Maybe (isJust)
+import Test.Framework (Test, defaultMain)
+import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck
 
 import Debug.Trace
@@ -9,7 +14,7 @@ import Data.Tree
 
 validateSearchTree :: SearchTree t -> Bool
 validateSearchTree (SearchTree node xs)
-  = assert (not allExplored || mu <= m) $
+  = assert (n == 0 || mu <= m) $
     assert (not $ isNaN mu) $
     assert (not $ isNaN m) $
     assert (minimum [n, fromIntegral k, fromIntegral k'] >= 0) $
@@ -17,8 +22,7 @@ validateSearchTree (SearchTree node xs)
     assert (fromIntegral k == length xs) $
     assert (fromIntegral k' == length explored) $
     assert (n == sum playouts + if isJust x && n /= 0 then 1 else 0) $
-    assert (m >= maximum maxes) $
-    --assert (not allExplored || (mu <= mu_max && mu >= mu_min)) $
+    assert (null xs || m >= maximum maxes) $
     if n == 0 
       then True 
       else assert (all validateSearchTree xs)
@@ -39,43 +43,58 @@ maximizationTree :: (t -> Float) -> Probe t -> Int -> SearchTree t
 maximizationTree eval p k = go k inf (-inf) $ searchTree p
   where inf = 1 / 0 :: Float                                                    
         go 0 _ _ t = t
-        go k l u t = if b then t' else go (k - 1) l' u' t'
+        go k l u t
+          | b || (u' == inf) = t'
+          | otherwise = go (k - 1) l' u' t'
           where PlayoutResult t' x e l' u' b = playout eval l u t    
 
-data FloatEval = FloatEval String (Float -> Float)
+data Eval a = Eval String (a -> Float)
 
-instance Show FloatEval where
-  show (FloatEval s _) = s
+instance Show (Eval a) where
+  show (Eval s _) = s
 
-floatEvals :: [FloatEval]
+floatEvals :: [Eval Float]
 floatEvals = [
-  FloatEval "square" $ \x -> x ** 2,
-  FloatEval "poly" $ \x -> x ** 3 + 5 * x ** 2 + 0.01 * x ** 7,
-  FloatEval "case" $ \x -> if x < 2 then x else x + 4,
-  FloatEval "sin" sin,
-  FloatEval "floor log" $ \x -> (x - fromIntegral (floor x)) + 5 + log (abs x),
-  FloatEval "sub" $ \x -> x - 2,
-  FloatEval "exp" x,
-  FloatEval "const" $ \x -> 0, 
-  FloatEval "sqrt" $ \x -> abs x ** 0.5]
+  Eval "square" $ \x -> x ** 2,
+  Eval "poly" $ \x -> x ** 3 + 5 * x ** 2 + 0.01 * x ** 7,
+  Eval "case" $ \x -> if x < 2 then x else x + 4,
+  Eval "sin" sin,
+  Eval "floor log" $ \x -> (x - fromIntegral (floor x)) + 5 + 
+                                log (2 + abs x),
+  Eval "sub" $ \x -> x - 2,
+  Eval "exp" exp,
+  Eval "const" $ \x -> 0, 
+  Eval "sqrt" $ \x -> abs x ** 0.5]
 
-instance Arbitrary FloatEval where
+intEvals :: [Eval Int]
+intEvals = [Eval s (f . fromIntegral) | Eval s f <- floatEvals]
+
+instance Arbitrary (Eval Float) where
   arbitrary = oneof $ map return floatEvals
+
+instance Arbitrary (Eval Int) where
+  arbitrary = oneof $ map return intEvals
 
 validProbe p eval k = validateSearchTree $ maximizationTree eval p k
 
-data DefaultProbe t = Exponential t
-                    | Normal t t
+data DefaultProbe t = Exponential t | Normal t t
                     | Uniform t t deriving (Show)
 
-makeFloatingProbe (Exponential mu) = exponential mu
-makeFloatingProbe (Normal mu sigma) = normal mu sigma
-makeFloatingProbe (Uniform a b) = uniform a b
+makeFloatProbe :: DefaultProbe Float -> Probe Float 
+makeFloatProbe (Exponential mu) = exponential mu
+makeFloatProbe (Normal mu sigma) = normal mu sigma
+makeFloatProbe (Uniform a b) = uniform a b
 
-arbitraryExponential :: (Arbitrary t, Num t) => Gen (DefaultProbe t)
+makeIntProbe :: DefaultProbe Int -> Probe Int
+makeIntProbe (Exponential mu) = exponentialInt (fromIntegral mu)
+makeIntProbe (Normal mu sigma) = 
+  normalInt (fromIntegral mu) $ fromIntegral sigma 
+makeIntProbe (Uniform a b) = uniformInt a b
+
+arbitraryExponential :: (Arbitrary t, Num t, Ord t) => Gen (DefaultProbe t)
 arbitraryExponential = 
-  do mu <- arbitrary
-     return . Exponential $ abs (abs mu + 1)
+  do (NonNegative mu) <- arbitrary
+     return $ Exponential mu 
 
 arbitraryNormal :: (Arbitrary t, Num t, Ord t) => Gen (DefaultProbe t)
 arbitraryNormal = 
@@ -92,17 +111,44 @@ arbitraryUniform =
 instance (Arbitrary t, Num t, Ord t) => Arbitrary (DefaultProbe t) where
   arbitrary = oneof [arbitraryExponential, arbitraryNormal, arbitraryUniform]
 
-test1 p (FloatEval _ eval) (NonNegative k) =
-  validProbe (makeFloatingProbe p) eval (abs k)
+prop_ValidFloat :: DefaultProbe Float -> Eval Float -> NonNegative Int -> Bool
+prop_ValidFloat p (Eval _ eval) (NonNegative k) =
+  validProbe (makeFloatProbe p) eval k
 
-searchTreeToTree (SearchTree n xs) = Data.Tree.Node n $ map searchTreeToTree xs 
-                                                                                
-fmtTree t k = drawTree $ fmap show $ cut k $ searchTreeToTree $ t               
-                                                                                
-cut 0 (Data.Tree.Node n xs) = Data.Tree.Node n []                               
-cut k (Data.Tree.Node n xs) = Data.Tree.Node n $ map (cut $ k - 1) xs           
-                                                                                
-layer 0 (Data.Tree.Node n _) = [n]                                              
-layer k (Data.Tree.Node _ xs) = concatMap (layer $ k - 1) xs                    
-                                                                                
-                      
+prop_ValidInt :: DefaultProbe Int -> Eval Int -> NonNegative Int -> Bool
+prop_ValidInt p (Eval _ eval) (NonNegative k) = 
+  validProbe (makeIntProbe p) eval k
+
+prop_UniformIntExhaustive :: Int -> Positive Int -> Property
+prop_UniformIntExhaustive a (Positive x) = 
+  sort (map fst . maximize (const 0) $ uniformInt a b) === [a..b-1]
+  where b = a + x
+
+prop_UniformBounds :: Float -> Positive Float -> Positive Int -> Bool
+prop_UniformBounds a (Positive x) (Positive k) = 
+ all (\x -> a <= x && x < b) . 
+ take k . 
+ map fst . 
+ maximize (const 0) $ 
+ uniform a b
+ where b = a + x
+
+prop_ExponentialBounds :: NonNegative Float -> Positive Int -> Bool
+prop_ExponentialBounds (NonNegative mu) (Positive k) = 
+  all (>=0) .
+  take k . 
+  map fst .
+  maximize (const 0) $
+  exponential mu 
+
+tests :: [Test]
+tests = [testProperty "prop_ValidFloat" prop_ValidFloat,
+         testProperty "prop_ValidInt" prop_ValidInt,
+         testProperty "prop_UniformIntExhaustive" prop_UniformIntExhaustive,
+         testProperty "prop_UniformBounds" prop_UniformBounds,
+         testProperty "prop_ExponentialBounds" prop_ExponentialBounds]
+
+main :: IO ()
+main = defaultMain tests
+           
+
