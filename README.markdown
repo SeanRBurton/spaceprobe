@@ -10,7 +10,7 @@ high-dimensional search spaces.
 I'm more than happy to recieve bug reports, fixes, improved documentation, 
 feature enhancements, and other improvements.
 
-Please reporte bugs using the [github issue tracker](https://github.com/SeanRBurton/spaceprobe/issues/).
+Please report bugs using the [github issue tracker](https://github.com/SeanRBurton/spaceprobe/issues/).
 
 Authors  
 -------
