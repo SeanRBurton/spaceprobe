@@ -25,7 +25,8 @@ library
   build-depends: base,
                  containers,
                  clock,
-                 erf
+                 erf,
+                 mtl
   exposed-modules: Control.SpaceProbe.Probe
                    Control.SpaceProbe.Search
                   -- Control.SpaceProbe.Internal.Probe
@@ -47,7 +48,8 @@ test-suite tests
     test-framework-quickcheck2 >= 0.3.0.3,
     clock,
     erf,
-    containers
+    containers,
+    mtl
 
 benchmark benchmarks
   type: exitcode-stdio-1.0

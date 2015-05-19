@@ -16,17 +16,25 @@ module Control.SpaceProbe.Search (
   PlayoutResult(..),
   SearchNode(..),
   SearchTree(..), 
-  playout,
+  playoutM,
   searchTree,
   -- * Optimization
   maximize,
   minimize,
+  -- * Monadic Optimization
+  maximizeM,
+  minimizeM,
+  -- * Optimization in IO
+  maximizeIO,
+  minimizeIO,
   -- * Optimization output processing
   highestYet,
   lowestYet,
   evaluateForusecs
 ) where 
 
+import Control.Monad (liftM)
+import Control.Monad.Identity (runIdentity, Identity(..))
 import Control.SpaceProbe.Probe
 import Control.Exception (evaluate)
 import Data.Int (Int16, Int64)
@@ -105,53 +113,91 @@ data PlayoutResult t = PlayoutResult {
   _fullyExplored :: !Bool
 }
 
-playout :: (t -> Float) -> 
-           Float -> 
-           Float ->
-           SearchTree t -> 
-           PlayoutResult t
-playout eval = go 
-  where go !l !u (SearchTree !a !xs) =
+playoutM :: Monad m =>
+            (t -> m Float) ->
+            Float -> 
+            Float ->
+            SearchTree t ->
+            m (PlayoutResult t)
+playoutM eval = go
+  where go !l !u (SearchTree !a !xs) = 
           case (_value a, xs) of
-            (Nothing, []) -> error "playout"
+            (Nothing, []) -> error "playoutIO"
             (Just x,   _) -> if null xs || _playouts a == 0
-                               then let  e = eval x
-                                         (a', b) = update a e False
-                                    in PlayoutResult {
-                                         _tree          = 
-                                           SearchTree a' xs,
-                                         _input         = x,
-                                         _eval          = e,
-                                         _min           = min l e,
-                                         _max           = max u e,
-                                         _fullyExplored = b 
-                                       }
-                               else recur 
-            (Nothing, _) -> recur 
+                               then do e <- eval x
+                                       let (a', b) = update a e False
+                                       return $ PlayoutResult {
+                                                  _tree          = 
+                                                    SearchTree a' xs,
+                                                  _input         = x,
+                                                  _eval          = e,
+                                                  _min           = min l e,
+                                                  _max           = max u e,
+                                                  _fullyExplored = b
+                                                }
+                               else recur
+            (Nothing, _) -> recur
           where recur = let (y:ys) = xs
-                            r =  go l u y
-                            zs = insert (_min r) 
-                                        (_max r) 
-                                        (_playouts a) 
-                                        (_tree r) ys
-                            (a', b) = update a (_eval r) (_fullyExplored r)
-                        in r{_tree = SearchTree a' zs, _fullyExplored = b}      
+                        in do r <- go l u y
+                              let zs = insert (_min r)
+                                              (_max r)
+                                              (_playouts a)
+                                              (_tree r) ys
+                              let (a', b) = update a (_eval r) 
+                                                     (_fullyExplored r)
+                              return $ r{_tree = SearchTree a' zs, 
+                                         _fullyExplored = b}
+{-# INLINE playoutM #-}
+
+maximize_ :: Monad m => 
+             (m [(t, Float)] -> m [(t, Float)]) ->
+             (t -> m Float) ->
+             Probe t ->
+             m [(t, Float)]
+maximize_ rest eval = go inf (-inf) . searchTree
+  where inf = 1 / 0 :: Float
+        go l u t = do PlayoutResult t' x e l' u' b <- playoutM eval l u t
+                      if b || (u' == inf)
+                         then return [(x, e)]
+                         else do xs <- rest $ go l' u' t'
+                                 return $ (x, e) : xs
+{-# INLINE maximize_ #-}
 
 -- | Fairly self-explanatory. Maximize the objective function @eval@ over the
 -- given @Probe@. Keeps lazily generating samples until it explores the whole
 -- search space so you almost certainly want to apply some cut-off criterion. 
-
 maximize :: (t -> Float) -> Probe t -> [(t, Float)]
-maximize eval p = go inf (-inf) $ searchTree p
-  where inf = 1 / 0 :: Float 
-        go l u t = (x, e) : (if b || (u' == inf) then [] else go l' u' t')
-          where PlayoutResult t' x e l' u' b = playout eval l u t
+maximize eval = runIdentity . maximize_ id (Identity . eval)
 
 -- | The opposite of maximize. 
 -- 
 -- @minimize eval = map (fmap negate) . maximize (negate . eval)@
 minimize :: (t -> Float) -> Probe t -> [(t, Float)]
 minimize eval = map (fmap negate) . maximize (negate . eval)
+
+type OptimizeM m t = (t -> m Float) -> Probe t -> m [(t, Float)]
+
+invert :: Monad m => OptimizeM m t -> OptimizeM m t
+invert maximize_ eval = liftM (map $ fmap negate) . 
+                        maximize_ (liftM negate . eval)
+
+-- | Maximize in the given monad. The underlying bind operator must be lazy if
+-- you want to generate the result list incrementally. 
+maximizeM :: Monad m => (t -> m Float) -> Probe t -> m [(t, Float)]
+maximizeM eval = maximize_ id eval
+
+-- | The opposite of maximizeM
+minimizeM :: Monad m => (t -> m Float) -> Probe t -> m [(t, Float)]
+minimizeM = invert maximizeM
+
+-- | The equivalent of maximize, but running in the IO Monad. Generates the 
+-- output list lazily.
+maximizeIO :: (t -> IO Float) -> Probe t -> IO [(t, Float)]
+maximizeIO eval = maximize_ unsafeInterleaveIO eval
+
+-- | The opposite of maximizeIO
+minimizeIO :: (t -> IO Float) -> Probe t -> IO [(t, Float)]
+minimizeIO = invert maximizeIO
 
 highestYet_ :: Ord b => (a -> b) -> [a] -> [a]
 highestYet_ _ [] = []
@@ -166,12 +212,13 @@ lowestYet_ :: (Num b, Ord b) => (a -> b) -> [a] -> [a]
 lowestYet_ f = highestYet_ (negate . f)
 
 -- | Preserves only those elements @(_, b)@ for which @b@ is higher than for
--- all previous previous values in the list. Designed for use with maximize
+-- all previous previous values in the list. Designed for use with 
+-- maximization
 highestYet ::[(a, Float)] -> [(a, Float)]
 highestYet = highestYet_ snd
 
 -- | Preserves only those elements @(_, b)@ for which @b@ is lower than for all
--- previous values in the list. Designed for use with minimize.
+-- previous values in the list. Designed for use with minimization.
 -- 
 -- @lowestYet xs == map (fmap negate) . highestYet . map (fmap negate)@
 lowestYet :: [(a, Float)] -> [(a, Float)]
@@ -181,8 +228,8 @@ getTimeInUsecs :: IO Int64
 getTimeInUsecs = do TimeSpec s n <- getTime Monotonic                           
                     return $ 1000000 * s + n `div` 1000                         
 
--- | Take the largest prefix of @xs@ which can be evaluated 
--- within @dt@ microseconds.
+-- | Take the largest prefix of @xs@ which can be evaluated within @dt@ 
+-- microseconds.
 evaluateForusecs :: Int -> [a] -> IO [a]                                                 
 evaluateForusecs dt xs = do{t <- getTimeInUsecs; go t xs}                                
   where go !_ ![]     = return []                                               
