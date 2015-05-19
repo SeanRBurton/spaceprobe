@@ -18,6 +18,8 @@ description:
     and/or high-dimensional search spaces.
 extra-source-files:
     README.markdown
+    benchmarks/*.hs
+    tests/*.hs
 
 library
   build-depends: base,
@@ -33,19 +35,32 @@ library
 test-suite tests
   type:           exitcode-stdio-1.0
   hs-source-dirs: tests .
-  main-is:        tests.hs
+  main-is:        Tests.hs
 
   ghc-options:
     -Wall
 
   build-depends:
-    QuickCheck >= 2.7
+    base,
+    QuickCheck >= 2.7,
+    test-framework >= 0.8.0.2,
+    test-framework-quickcheck2 >= 0.3.0.3,
+    clock,
+    erf,
+    containers
 
 benchmark benchmarks
   type: exitcode-stdio-1.0
   hs-source-dirs: benchmarks
-  ghc-options: -O2 -Wall
   main-is: Benchmarks.hs
+
+  ghc-options: -O2 -Wall
+
+  build-depends:
+    base,
+    criterion,
+    spaceprobe
+
   
 source-repository head
   type:     git

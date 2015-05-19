@@ -3,14 +3,11 @@
 import Control.Exception (assert)
 import Control.SpaceProbe.Probe
 import Control.SpaceProbe.Search
-import Data.List  (nub, sort)
+import Data.List (sort)
 import Data.Maybe (isJust)
 import Test.Framework (Test, defaultMain)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck
-
-import Debug.Trace
-import Data.Tree
 
 validateSearchTree :: SearchTree t -> Bool
 validateSearchTree (SearchTree node xs)
@@ -28,25 +25,20 @@ validateSearchTree (SearchTree node xs)
       else assert (all validateSearchTree xs)
     True 
   where SearchNode x mu m n k k' = node
-        nan = 0 / 0
         nodes = map _node xs
-        fullyExplored (SearchNode _ _ _ n k k') = k == k' && (n /= 0)
+        fullyExplored (SearchNode _ _ _ n_ k_ k'_) = k_ == k'_ && (n_ /= 0)
         explored = filter fullyExplored nodes
-        means = map _mean nodes
         maxes = map _maximum nodes
         playouts = map _playouts nodes
-        allExplored = all (>0) playouts
-        mu_max = maximum means
-        mu_min = minimum means
   
 maximizationTree :: (t -> Float) -> Probe t -> Int -> SearchTree t
 maximizationTree eval p k = go k inf (-inf) $ searchTree p
   where inf = 1 / 0 :: Float                                                    
         go 0 _ _ t = t
-        go k l u t
+        go k' l u t
           | b || (u' == inf) = t'
-          | otherwise = go (k - 1) l' u' t'
-          where PlayoutResult t' x e l' u' b = playout eval l u t    
+          | otherwise = go (k' - 1) l' u' t'
+          where PlayoutResult t' _ _ l' u' b = playout eval l u t    
 
 data Eval a = Eval String (a -> Float)
 
@@ -59,11 +51,11 @@ floatEvals = [
   Eval "poly" $ \x -> x ** 3 + 5 * x ** 2 + 0.01 * x ** 7,
   Eval "case" $ \x -> if x < 2 then x else x + 4,
   Eval "sin" sin,
-  Eval "floor log" $ \x -> (x - fromIntegral (floor x)) + 5 + 
+  Eval "floor log" $ \x -> (x - fromIntegral (floor x :: Integer)) + 5 + 
                                 log (2 + abs x),
   Eval "sub" $ \x -> x - 2,
   Eval "exp" exp,
-  Eval "const" $ \x -> 0, 
+  Eval "const" $ const 0, 
   Eval "sqrt" $ \x -> abs x ** 0.5]
 
 intEvals :: [Eval Int]
@@ -75,6 +67,7 @@ instance Arbitrary (Eval Float) where
 instance Arbitrary (Eval Int) where
   arbitrary = oneof $ map return intEvals
 
+validProbe :: Probe t -> (t -> Float) -> Int -> Bool
 validProbe p eval k = validateSearchTree $ maximizationTree eval p k
 
 data DefaultProbe t = Exponential t | Normal t t
@@ -119,6 +112,14 @@ prop_ValidInt :: DefaultProbe Int -> Eval Int -> NonNegative Int -> Bool
 prop_ValidInt p (Eval _ eval) (NonNegative k) = 
   validProbe (makeIntProbe p) eval k
 
+prop_ExponentialIntBounds :: NonNegative Float -> Positive Int -> Bool
+prop_ExponentialIntBounds (NonNegative mu) (Positive k) = 
+  all (>=(0 :: Int)) .
+  take k .
+  map fst .
+  maximize (const 0) $
+  exponentialInt mu
+
 prop_UniformIntExhaustive :: Int -> Positive Int -> Property
 prop_UniformIntExhaustive a (Positive x) = 
   sort (map fst . maximize (const 0) $ uniformInt a b) === [a..b-1]
@@ -126,7 +127,7 @@ prop_UniformIntExhaustive a (Positive x) =
 
 prop_UniformBounds :: Float -> Positive Float -> Positive Int -> Bool
 prop_UniformBounds a (Positive x) (Positive k) = 
- all (\x -> a <= x && x < b) . 
+ all (\y -> a <= y && y < b) . 
  take k . 
  map fst . 
  maximize (const 0) $ 
@@ -141,14 +142,25 @@ prop_ExponentialBounds (NonNegative mu) (Positive k) =
   maximize (const 0) $
   exponential mu 
 
+strictMonotone :: Ord a => [a] -> Bool
+strictMonotone [] = True
+strictMonotone xs = all id $ zipWith (>) xs (tail xs)  
+
+prop_LowestYet :: [(Int, Float)] -> Bool
+prop_LowestYet = strictMonotone . map snd . lowestYet
+
+prop_HighestYet :: [(Int, Float)] -> Bool
+prop_HighestYet = strictMonotone . reverse . map snd . highestYet
+
 tests :: [Test]
 tests = [testProperty "prop_ValidFloat" prop_ValidFloat,
          testProperty "prop_ValidInt" prop_ValidInt,
          testProperty "prop_UniformIntExhaustive" prop_UniformIntExhaustive,
          testProperty "prop_UniformBounds" prop_UniformBounds,
-         testProperty "prop_ExponentialBounds" prop_ExponentialBounds]
+         testProperty "prop_ExponentialBounds" prop_ExponentialBounds,
+         testProperty "prop_LowestYet" prop_LowestYet,
+         testProperty "prop_HighestYet" prop_HighestYet,
+         testProperty "prop_ExponentialIntBounds" prop_ExponentialIntBounds] 
 
 main :: IO ()
 main = defaultMain tests
-           
-

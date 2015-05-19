@@ -75,7 +75,7 @@ ucb :: Int64 -> Float -> Float -> SearchNode t -> Float
 ucb n_total l u (SearchNode _ mu m n k k')
   | n  == 0 = -1.0 / 0
   | k' == k = 1
-  | otherwise = negate $ normalize (0.5 * mu + 0.5 * m) + 
+  | otherwise = negate $ normalize (0.8 * mu + 0.2 * m) + 
                          sqrt (2 * log (i2f n_total) / i2f n)
   where normalize x
           | u == l = -0.5
