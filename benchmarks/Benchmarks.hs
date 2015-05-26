@@ -106,7 +106,7 @@ farFrom x y = abs(y - x) / abs(x) >= 0.01
 
 runBenchmark :: Show a => (a -> Float) ->  Probe a -> Float -> IO (a, Float)
 runBenchmark f p x = fmap (last . lowestYet) .
-                     evaluateForusecs 5000000 . 
+                     evaluateForusecs 700000 . 
                      takeWhileInclusive (farFrom x . snd) $ 
                      minimize f p
 

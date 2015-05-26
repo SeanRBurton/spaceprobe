@@ -23,7 +23,7 @@ import Control.Applicative (
   (<*>), 
   (<|>),
   (<$>))
-import Data.Number.Erf (Erf, InvErf, invnormcdf, normcdf)
+import Data.Number.Erf (InvErf, invnormcdf, normcdf)
 import Data.Tree(Forest, Tree(..))
 
 -- | The main data structure for this module; it describes 

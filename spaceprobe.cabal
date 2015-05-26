@@ -1,5 +1,5 @@
 name:            spaceprobe
-version:         0.0.0
+version:         0.2.0
 license:         BSD3
 license-file:    LICENSE
 category:        Optimization
@@ -22,15 +22,15 @@ extra-source-files:
     tests/*.hs
 
 library
-  build-depends: base,
-                 containers,
-                 clock,
-                 erf,
-                 mtl
+  build-depends: base >=2 && <5,
+                 containers -any,
+                 clock >=0.4.2.0,
+                 erf >=2.0.0.0,
+                 mtl >=2.0.1.1
   exposed-modules: Control.SpaceProbe
                    Control.SpaceProbe.Internal.Probe
                    Control.SpaceProbe.Internal.Optimize
-  ghc-options: -O3 -fllvm -Wall
+  ghc-options: -O3 -funbox-strict-fields -fllvm -Wall
 
 test-suite tests
   type:           exitcode-stdio-1.0
@@ -41,14 +41,14 @@ test-suite tests
     -Wall
 
   build-depends:
-    base,
-    QuickCheck >= 2.7,
-    test-framework >= 0.8.0.2,
-    test-framework-quickcheck2 >= 0.3.0.3,
-    clock,
-    erf,
-    containers,
-    mtl
+    base >=2 && <5,
+    QuickCheck ==1.0,
+    test-framework >=0.1,
+    test-framework-quickcheck2 >=0.2.1,
+    clock >=0.4.2.0,
+    erf >=2.0.0.0,
+    containers -any,
+    mtl >=2.0.1.1
 
 benchmark benchmarks
   type: exitcode-stdio-1.0
@@ -58,9 +58,9 @@ benchmark benchmarks
   ghc-options: -O2 -Wall
 
   build-depends:
-    base,
-    criterion,
-    spaceprobe
+    base >=2 && <5,
+    criterion >=0.1,
+    spaceprobe >=0.0.0
 
   
 source-repository head
