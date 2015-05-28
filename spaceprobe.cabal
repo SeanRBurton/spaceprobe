@@ -1,19 +1,19 @@
 name:            spaceprobe
-version:         0.2.0
+version:         0.3.0
 license:         BSD3
 license-file:    LICENSE
 category:        Optimization
-author:          Sean Burton <burton.seanr@gmail.com> 
+author:          Sean Burton <burton.seanr@gmail.com>
 maintainer:      Sean Burton <burton.seanr@gmail.com>
 stability:       experimental
 tested-with:     GHC == 7.6
-synopsis:        Optimization over arbitrary search spaces 
+synopsis:        Optimization over arbitrary search spaces
 cabal-version:   >= 1.8
 homepage:        https://github.com/SeanRBurton/spaceprobe
 bug-reports:     https://github.com/SeanRBurton/spaceprobe/issues
 build-type:      Simple
 description:
-    A parameter optimization library, designed for optimizing over 
+    A parameter optimization library, designed for optimizing over
     arbitrary search spaces. It is particularly well suited for discontinuous
     and/or high-dimensional search spaces.
 extra-source-files:
@@ -42,7 +42,7 @@ test-suite tests
 
   build-depends:
     base >=2 && <5,
-    QuickCheck ==1.0,
+    QuickCheck >=1.0,
     test-framework >=0.1,
     test-framework-quickcheck2 >=0.2.1,
     clock >=0.4.2.0,
@@ -62,7 +62,7 @@ benchmark benchmarks
     criterion >=0.1,
     spaceprobe >=0.0.0
 
-  
+
 source-repository head
   type:     git
   location: https://github.com/SeanRBurton/spaceprobe
